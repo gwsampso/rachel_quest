@@ -4,7 +4,7 @@ interface TypewriterProps {
   text: string;
   speed?: number;
   onComplete?: () => void;
-  onChar?: () => void; // Added for sound effects
+  onChar?: () => void;
   className?: string;
 }
 
@@ -12,12 +12,14 @@ const Typewriter: React.FC<TypewriterProps> = ({ text, speed = 30, onComplete, o
   const [displayedText, setDisplayedText] = useState('');
   const [index, setIndex] = useState(0);
 
+  // Reset when text changes
   useEffect(() => {
     setDisplayedText('');
     setIndex(0);
   }, [text]);
 
   useEffect(() => {
+    // Only type if we haven't reached the end
     if (index < text.length) {
       const timeoutId = setTimeout(() => {
         setDisplayedText((prev) => prev + text.charAt(index));
@@ -25,18 +27,18 @@ const Typewriter: React.FC<TypewriterProps> = ({ text, speed = 30, onComplete, o
         if (onChar) onChar();
       }, speed);
       return () => clearTimeout(timeoutId);
-    } else {
+    } else if (index === text.length && text.length > 0 && displayedText === text) {
+      // Trigger complete only once after full display and matching content
       if (onComplete) {
         onComplete();
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, text, speed]);
+  }, [index, text, speed, onComplete, onChar, displayedText]);
 
   return (
     <div className={className}>
       {displayedText}
-      <span className="animate-pulse">_</span>
+      {index < text.length && <span className="animate-pulse">_</span>}
     </div>
   );
 };

@@ -20,25 +20,46 @@ interface SuccessData {
   houseUpgraded?: boolean;
 }
 
-// --- Enhanced 8-Bit Audio Engine ---
+// --- Singleton 8-Bit Audio Engine ---
+let audioCtx: AudioContext | null = null;
+
+const getAudioCtx = () => {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+};
+
 const playBleep = (freq: number = 440, type: OscillatorType = 'square', duration: number = 0.1, gainVal: number = 0.1) => {
   try {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
     osc.type = type;
-    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(gainVal, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+    
     osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    gain.connect(ctx.destination);
+    
     osc.start();
-    osc.stop(audioCtx.currentTime + duration);
-  } catch (e) { console.warn("Audio blocked"); }
+    osc.stop(ctx.currentTime + duration);
+  } catch (e) { 
+    console.warn("Bleep failed", e); 
+  }
 };
 
 const playStartSound = () => {
   [440, 554, 659, 880].forEach((f, i) => setTimeout(() => playBleep(f, 'square', 0.2), i * 100));
+};
+
+const playBossChime = () => {
+  [110, 82, 110, 164, 110, 220, 164, 220].forEach((f, i) => setTimeout(() => playBleep(f, 'sawtooth', 0.1, 0.2), i * 120));
 };
 
 const playCoinSound = () => {
@@ -47,7 +68,7 @@ const playCoinSound = () => {
 };
 
 const playTypewriterTick = () => {
-  playBleep(150, 'sawtooth', 0.01, 0.02);
+  playBleep(150, 'sawtooth', 0.01, 0.01);
 };
 
 const playLevelUp = () => {
@@ -68,7 +89,7 @@ const playBabyGreeting = () => {
 
 const playProposalChime = () => {
   [440, 554, 659, 880, 1108, 1318].forEach((freq, i) => {
-    setTimeout(() => playBleep(freq, 'sine', 0.3), i * 100);
+    setTimeout(() => playBleep(freq, 'sine', 0.3, 0.05), i * 100);
   });
 };
 
@@ -133,6 +154,7 @@ const App: React.FC = () => {
   const [textCompleted, setTextCompleted] = useState(false);
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
   const [particles, setParticles] = useState<{ id: number, x: number, y: number }[]>([]);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
     async function initAssets() {
@@ -147,6 +169,60 @@ const App: React.FC = () => {
     }
     initAssets();
   }, []);
+
+  // Ensure options are always hidden when starting a new scenario
+  useEffect(() => {
+    setTextCompleted(false);
+  }, [playerState.currentScenarioId]);
+
+  const triggerBlackout = () => {
+    const overlay = document.getElementById('flash-overlay');
+    if (overlay) {
+      overlay.classList.remove('animate-flash');
+      void overlay.offsetWidth; 
+      overlay.classList.add('animate-flash');
+    }
+  };
+
+  const triggerSlowReveal = () => {
+    const overlay = document.getElementById('flash-overlay');
+    if (overlay) {
+      // Remove any previous animations
+      overlay.classList.remove('animate-flash');
+      overlay.classList.remove('animate-reveal-slow');
+      
+      // Ensure it starts from opacity 1 (black)
+      void overlay.offsetWidth; 
+      
+      overlay.classList.add('animate-reveal-slow');
+    }
+  };
+
+  const triggerBossEncounter = () => {
+    const overlay = document.getElementById('boss-overlay');
+    const container = document.getElementById('checker-container');
+    if (overlay && container) {
+      playBossChime();
+      overlay.classList.add('animate-boss-encounter');
+      
+      container.innerHTML = '';
+      // Increased grid density (15x15)
+      for (let i = 0; i < 225; i++) { 
+        const square = document.createElement('div');
+        square.className = 'checker-square';
+        // Increased delay range to make the transition longer (up to 2.5s delay + 0.8s animation)
+        square.style.animationDelay = `${Math.random() * 2.5}s`; 
+        square.classList.add('animate-checker');
+        container.appendChild(square);
+      }
+
+      // Cleanup after the blackout effect takes over
+      setTimeout(() => {
+        overlay.classList.remove('animate-boss-encounter');
+        container.innerHTML = '';
+      }, 4000); 
+    }
+  };
 
   const generateLegend = async () => {
     setLoadingLegend(true);
@@ -201,31 +277,32 @@ const App: React.FC = () => {
     setTextCompleted(false);
     setSuccessData(null);
   };
+  
+  const retryLevel = () => {
+    playBleep(440, 'square', 0.1, 0.1);
+    setPhase('PLAYING');
+    setGameOverReason('');
+    // We do NOT reset playerState here, preserving the progress up to this level.
+    // The scenario renders again, giving the user a second chance.
+  };
 
   const handleOptionSelect = (optionId: 'A' | 'B') => {
     const currentScenario = SCENARIOS[playerState.currentScenarioId];
-    const selectedOption = currentScenario.options.find(o => o.id === optionId);
+    if (!currentScenario) return;
 
+    const selectedOption = currentScenario.options.find(o => o.id === optionId);
     if (!selectedOption) return;
+
+    setTextCompleted(false);
 
     if (selectedOption.isGameOver) {
       playGameOverChime();
       setGameOverReason(selectedOption.gameOverReason || 'GAME OVER');
       setPhase('GAME_OVER');
     } else {
-      // Trigger character sounds
       if (selectedOption.familyAdd === 'Glenn') playMaleGreeting();
       else if (selectedOption.familyAdd === 'Lachlan' || selectedOption.familyAdd === 'Finley') playBabyGreeting();
       
-      const newInventory = selectedOption.inventoryItem 
-        ? [...playerState.inventory, selectedOption.inventoryItem]
-        : playerState.inventory;
-      
-      const newFamily = selectedOption.familyAdd 
-        ? [...playerState.family, selectedOption.familyAdd]
-        : playerState.family;
-      const newHouseLevel = playerState.houseLevel + (selectedOption.houseLevelChange || 0);
-
       const nextId = selectedOption.nextScenarioId || 'VICTORY';
       
       let isLevelUp = false;
@@ -235,31 +312,43 @@ const App: React.FC = () => {
         if (nextScenario && nextScenario.levelTitle !== currentScenario.levelTitle) {
           isLevelUp = true;
           newLevelTitle = nextScenario.levelTitle;
-          playLevelUp();
-        } else {
-          // Play coin sound for normal success
-          playCoinSound();
         }
-      } else {
-        playProposalChime();
       }
 
-      // Calculate Love & Hearts
-      let nextHearts = playerState.hearts;
-      let nextLove = playerState.currentLevelLove + (selectedOption.loveMeterChange || 0);
-
-      if (isLevelUp) {
-        nextHearts += 1;
-        nextLove = 0; // Reset love meter on level up
+      // Special handling for Major Reno to avoid spoiler feedback
+      if (playerState.currentScenarioId === 'major_reno' && !selectedOption.isGameOver) {
+        setIsTransitioning(true);
+        triggerBlackout();
+        
+        // Apply state changes silently
+        const updatedInventory = selectedOption.inventoryItem ? [...playerState.inventory, selectedOption.inventoryItem] : playerState.inventory;
+        const updatedFamily = selectedOption.familyAdd ? [...playerState.family, selectedOption.familyAdd] : playerState.family;
+        
+        setTimeout(() => {
+          setPlayerState(prev => ({
+            ...prev,
+            hearts: isLevelUp ? prev.hearts + 1 : prev.hearts,
+            currentLevelLove: 0,
+            inventory: updatedInventory,
+            family: updatedFamily,
+            houseLevel: prev.houseLevel + (selectedOption.houseLevelChange || 0),
+            currentScenarioId: 'final_level'
+          }));
+          setIsTransitioning(false);
+        }, 1500);
+        return;
       }
+
+      // Normal path for other scenarios
+      if (isLevelUp) playLevelUp(); else playCoinSound();
 
       setPlayerState(prev => ({
         ...prev,
-        hearts: nextHearts,
-        currentLevelLove: nextLove,
-        inventory: newInventory,
-        family: newFamily,
-        houseLevel: newHouseLevel
+        hearts: isLevelUp ? prev.hearts + 1 : prev.hearts,
+        currentLevelLove: isLevelUp ? 0 : prev.currentLevelLove + (selectedOption.loveMeterChange || 0),
+        inventory: selectedOption.inventoryItem ? [...prev.inventory, selectedOption.inventoryItem] : [...prev.inventory],
+        family: selectedOption.familyAdd ? [...prev.family, selectedOption.familyAdd] : [...prev.family],
+        houseLevel: prev.houseLevel + (selectedOption.houseLevelChange || 0)
       }));
 
       setSuccessData({
@@ -277,14 +366,31 @@ const App: React.FC = () => {
 
   const handleContinue = () => {
     if (!successData) return;
-    playBleep(440, 'square', 0.05);
-    if (successData.nextScenarioId === 'VICTORY') {
+    playBleep(440, 'square', 0.05, 0.05);
+    
+    if (successData.nextScenarioId === 'the_question') {
+      setIsTransitioning(true);
+      triggerBossEncounter(); // Starts ~3.5s sequence of chaos
+      
+      // At 3.5s, the screen is covered by black checkers.
+      // We swap the scene and trigger the slow reveal (fade from black).
+      setTimeout(() => {
+        setPlayerState(prev => ({ ...prev, currentScenarioId: successData.nextScenarioId }));
+        setTextCompleted(false);
+        setSuccessData(null);
+        
+        triggerSlowReveal();
+        
+        setIsTransitioning(false);
+      }, 3500); 
+    } else if (successData.nextScenarioId === 'VICTORY') {
       setPhase('VICTORY');
+      setSuccessData(null);
     } else {
       setPlayerState(prev => ({ ...prev, currentScenarioId: successData.nextScenarioId }));
       setTextCompleted(false);
+      setSuccessData(null);
     }
-    setSuccessData(null);
   };
 
   const getHouseIcon = (level: number) => {
@@ -340,8 +446,8 @@ const App: React.FC = () => {
           <Skull className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl text-red-500 mb-4 tracking-tighter uppercase">Wasted</h2>
           <p className="text-white mb-8 text-[10px] leading-loose">{gameOverReason}</p>
-          <button onClick={startGame} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 border-b-4 border-gray-900 w-full flex items-center justify-center gap-2 text-xs">
-            <RefreshCcw size={16} /> CONTINUE?
+          <button onClick={retryLevel} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 border-b-4 border-gray-900 w-full flex items-center justify-center gap-2 text-xs">
+            <RefreshCcw size={16} /> TRY AGAIN
           </button>
         </RetroCard>
       </div>
@@ -393,14 +499,16 @@ const App: React.FC = () => {
   }
 
   const currentScenario = SCENARIOS[playerState.currentScenarioId];
-  const activeImage = currentScenario.imageSrcKey ? loadedImages[currentScenario.imageSrcKey] : null;
+  const activeImage = currentScenario?.imageSrcKey ? loadedImages[currentScenario.imageSrcKey] : null;
+
+  if (!currentScenario) return null;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white font-['Press_Start_2P'] pb-32 relative overflow-y-auto">
       {successData && (
-        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div className={`fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto transition-opacity duration-500 ${isTransitioning ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
            <RetroCard borderColor="green" className="max-w-md w-full text-center">
-              {successData.isLevelUp && (
+              {successData.isLevelUp && successData.nextScenarioId !== 'the_question' && (
                  <div className="mb-6 animate-bounce">
                     <h3 className="text-yellow-300 text-lg md:text-xl tracking-widest border-y-4 border-yellow-300 py-2 uppercase">Level Up!</h3>
                     <p className="text-green-400 text-[8px] mt-2 uppercase">{successData.newLevelTitle}</p>
@@ -414,7 +522,6 @@ const App: React.FC = () => {
               <h2 className="text-sm md:text-lg text-green-400 mb-4 uppercase tracking-tighter">Journey Updated</h2>
               <p className="text-white text-[9px] md:text-[10px] leading-relaxed mb-6 italic">"{successData.text}"</p>
               
-              {/* FIXED: Visibility of stats and items */}
               <div className="bg-gray-800/80 p-4 border-2 border-green-900 rounded-lg mb-6 space-y-3">
                  <div className="flex justify-between items-center text-[10px] md:text-xs">
                     <span className="text-pink-400 flex items-center gap-2"><Heart size={14} className="fill-pink-400" /> LOVE GAINED</span>
@@ -431,7 +538,6 @@ const App: React.FC = () => {
                    </div>
                  )}
 
-                 {/* NEW HOUSE UPGRADE NOTIFICATION */}
                  {successData.houseUpgraded && (
                    <div className="flex justify-between items-center text-[10px] md:text-xs pt-2 border-t border-gray-700">
                       <span className="text-orange-400 flex items-center gap-2"><Home size={14} className="fill-orange-400" /> NEW HOME</span>
@@ -449,8 +555,8 @@ const App: React.FC = () => {
                  )}
               </div>
 
-              <button onClick={handleContinue} className="w-full bg-green-600 hover:bg-green-500 text-white py-4 flex items-center justify-center gap-4 text-[10px] border-b-4 border-green-800">
-                NEXT STAGE <ArrowRight size={16} />
+              <button onClick={handleContinue} className="w-full bg-green-600 hover:bg-green-500 text-white py-4 flex items-center justify-center gap-4 text-[10px] border-b-4 border-green-800 tracking-widest">
+                {successData.nextScenarioId === 'the_question' ? 'THE MOMENT...' : 'NEXT STAGE'} <ArrowRight size={16} />
               </button>
            </RetroCard>
         </div>
@@ -464,13 +570,11 @@ const App: React.FC = () => {
           
           <div className="flex justify-center mb-3">
              <div className="flex items-center gap-2 md:gap-4">
-                {/* Hearts Loop */}
                 <div className="flex items-center gap-1">
                    {Array.from({ length: playerState.hearts }).map((_, i) => (
                       <Heart key={i} className="text-red-500 fill-red-500 w-3 h-3 md:w-5 md:h-5 animate-pulse" />
                    ))}
                 </div>
-                {/* Love Meter Bar */}
                 <div className="w-32 md:w-64 h-2 md:h-4 bg-gray-800 border border-gray-600 relative">
                    <div className="h-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)] transition-all duration-1000" style={{ width: `${Math.min(playerState.currentLevelLove, 100)}%` }}></div>
                 </div>
@@ -521,22 +625,23 @@ const App: React.FC = () => {
 
         <RetroCard borderColor="blue" className="min-h-[100px] md:min-h-[140px]">
           <Typewriter 
+            key={playerState.currentScenarioId} 
             text={currentScenario.description} 
             speed={30} 
-            onChar={playTypewriterTick} // Added sound
-            onComplete={() => setTextCompleted(true)} 
+            onChar={playTypewriterTick} 
+            onComplete={() => !isTransitioning && setTextCompleted(true)} 
             className="text-[8px] md:text-sm leading-relaxed text-blue-100" 
           />
         </RetroCard>
 
-        <div className={`grid gap-3 md:grid-cols-2 transition-all duration-700 ${textCompleted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+        <div className={`grid gap-3 md:grid-cols-2 transition-all ${textCompleted && !isTransitioning ? 'opacity-100 translate-y-0 duration-700' : 'opacity-0 translate-y-4 pointer-events-none duration-0'}`}>
           {currentScenario.options.map((option) => (
-             <button key={option.id} onClick={() => handleOptionSelect(option.id)} className="bg-gray-900 border border-gray-700 hover:border-pink-500 active:bg-gray-800 p-3 md:p-4 text-left transition-colors relative group">
+             <button key={option.id} onClick={() => handleOptionSelect(option.id)} className={`bg-gray-900 border border-gray-700 hover:border-pink-500 active:bg-gray-800 p-3 md:p-4 text-left transition-colors relative group ${currentScenario.id === 'final_level' ? 'md:col-span-2' : ''}`}>
                <div className="flex items-center gap-3 md:gap-4 h-full">
                  <div className="flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded bg-pink-900/40 border border-pink-500 text-pink-500 font-bold text-[10px] md:text-sm shrink-0 group-hover:bg-pink-500 group-hover:text-white transition-colors">
                     {option.id}
                  </div>
-                 <span className="text-[9px] md:text-[11px] text-gray-200 leading-relaxed">{option.text}</span>
+                 <span className="text-[9px] md:text-[11px] text-gray-200 leading-relaxed uppercase">{option.text}</span>
                </div>
              </button>
           ))}

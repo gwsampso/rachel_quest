@@ -16,14 +16,11 @@
         overflow-x: hidden;
         overflow-y: auto;
         color: #fff;
-        /* Smooth scrolling for mobile */
         -webkit-overflow-scrolling: touch;
       }
       
-      /* CRT Screen Warp Effect */
       .crt-container {
         position: relative;
-        /* Removed overflow: hidden to allow scrolling */
       }
       
       .crt-container::before {
@@ -79,25 +76,86 @@
         100% { opacity: 0.63337; }
       }
 
-      .scanline {
-        width: 100%;
-        height: 100px;
-        z-index: 1002;
-        background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(255, 255, 255, 0.02) 50%, rgba(0,0,0,0) 100%);
-        opacity: 0.1;
+      /* Boss Encounter Strobe */
+      @keyframes boss-strobe {
+        0% { background-color: black; opacity: 1; }
+        12% { background-color: white; opacity: 1; }
+        25% { background-color: black; opacity: 1; }
+        37% { background-color: white; opacity: 1; }
+        50% { background-color: black; opacity: 1; }
+        62% { background-color: white; opacity: 1; }
+        75% { background-color: black; opacity: 1; }
+        87% { background-color: white; opacity: 1; }
+        100% { background-color: black; opacity: 1; }
+      }
+
+      /* Lengthened Checkerboard Fade */
+      @keyframes checkerboard-in {
+        0% { transform: scale(0); opacity: 0; }
+        100% { transform: scale(1.5); opacity: 1; }
+      }
+
+      .animate-boss-encounter {
+        animation: boss-strobe 0.8s steps(1) forwards;
+      }
+
+      .checkerboard-overlay {
         position: fixed;
-        bottom: 100%;
-        animation: scanline 8s linear infinite;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 10000;
+        display: grid;
+        grid-template-columns: repeat(15, 1fr); /* Increased grid density */
+        grid-template-rows: repeat(15, 1fr);
         pointer-events: none;
       }
 
-      @keyframes scanline {
-        0% { bottom: 100%; }
-        80% { bottom: -100%; }
-        100% { bottom: -100%; }
+      .checker-square {
+        background: black;
+        opacity: 0;
       }
 
-      /* Pixel cursor */
+      .animate-checker {
+        animation: checkerboard-in 0.8s forwards; /* Slower dissolve */
+      }
+
+      /* Cinematic Blackout for Time Skips */
+      @keyframes cinematic-blackout {
+        0% { opacity: 0; background-color: black; }
+        30% { opacity: 1; background-color: black; }
+        70% { opacity: 1; background-color: black; }
+        100% { opacity: 0; background-color: black; }
+      }
+
+      /* Slow Reveal for The Question */
+      @keyframes reveal-scene {
+        0% { opacity: 1; background-color: black; }
+        100% { opacity: 0; background-color: black; }
+      }
+
+      .flash-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      .animate-flash {
+        animation: cinematic-blackout 3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+
+      .animate-reveal-slow {
+        animation: reveal-scene 4s ease-in-out forwards;
+        z-index: 10002; /* Topmost priority */
+        pointer-events: none;
+      }
+
       * {
         cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><rect x="0" y="0" width="4" height="4" fill="white"/><rect x="4" y="4" width="4" height="4" fill="white"/><rect x="8" y="8" width="4" height="4" fill="white"/><rect x="0" y="0" width="2" height="2" fill="black"/><rect x="4" y="4" width="2" height="2" fill="black"/><rect x="8" y="8" width="2" height="2" fill="black"/></svg>'), auto;
       }
@@ -117,5 +175,8 @@
   <body class="crt-container">
     <div id="root"></div>
     <div class="scanline"></div>
+    <div id="flash-overlay" class="flash-overlay"></div>
+    <div id="boss-overlay" class="flash-overlay"></div>
+    <div id="checker-container" class="checkerboard-overlay"></div>
   </body>
 </html>
