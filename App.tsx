@@ -308,30 +308,7 @@ const App: React.FC = () => {
         }
       }
 
-      if (playerState.currentScenarioId === 'major_reno' && !selectedOption.isGameOver) {
-        setIsTransitioning(true);
-        triggerBlackout();
-        
-        const updatedInventory = selectedOption.inventoryItem ? [...playerState.inventory, selectedOption.inventoryItem] : playerState.inventory;
-        const updatedFamily = selectedOption.familyAdd ? [...playerState.family, selectedOption.familyAdd] : playerState.family;
-        
-        setTimeout(() => {
-          setPlayerState(prev => ({
-            ...prev,
-            hearts: isLevelUp ? prev.hearts + 1 : prev.hearts,
-            currentLevelLove: 0,
-            inventory: updatedInventory,
-            family: updatedFamily,
-            houseLevel: prev.houseLevel + (selectedOption.houseLevelChange || 0),
-            currentScenarioId: 'final_level'
-          }));
-          setIsTransitioning(false);
-        }, 1500);
-        return;
-      }
-
-      if (isLevelUp) playLevelUp(); else playCoinSound();
-
+      // Update state first
       setPlayerState(prev => ({
         ...prev,
         hearts: isLevelUp ? prev.hearts + 1 : prev.hearts,
@@ -340,6 +317,24 @@ const App: React.FC = () => {
         family: selectedOption.familyAdd ? [...prev.family, selectedOption.familyAdd] : [...prev.family],
         houseLevel: prev.houseLevel + (selectedOption.houseLevelChange || 0)
       }));
+
+      // SPECIAL BYPASS: If going to 'the_question', skip success modal and trigger cinematic immediately
+      if (nextId === 'the_question') {
+        setIsTransitioning(true);
+        triggerBossEncounter(); // Plays boss chime
+        
+        setTimeout(() => {
+          setPlayerState(prev => ({ ...prev, currentScenarioId: nextId }));
+          setTextCompleted(false);
+          setSuccessData(null); 
+          triggerSlowReveal();
+          setIsTransitioning(false);
+        }, 3000);
+        return; 
+      }
+
+      // STANDARD PATH: Play sounds and show modal
+      if (isLevelUp) playLevelUp(); else playCoinSound();
 
       setSuccessData({
         text: selectedOption.successFeedback || "Great choice!",
@@ -358,19 +353,18 @@ const App: React.FC = () => {
     if (!successData) return;
     playBleep(440, 'square', 0.05, 0.05);
     
-    if (successData.nextScenarioId === 'the_question') {
+    // Logic for other transitions if needed
+    if (successData.nextScenarioId === 'final_level') {
+      // Fade into the calm scene after Major Reno
       setIsTransitioning(true);
-      triggerBossEncounter(); 
+      triggerBlackout();
       
-      // Reduced timeout to 3.0s to match the exact completion of the squares.
-      // This eliminates the awkward black screen pause.
       setTimeout(() => {
         setPlayerState(prev => ({ ...prev, currentScenarioId: successData.nextScenarioId }));
         setTextCompleted(false);
         setSuccessData(null);
-        triggerSlowReveal();
         setIsTransitioning(false);
-      }, 3000); 
+      }, 2000); 
     } else if (successData.nextScenarioId === 'VICTORY') {
       setPhase('VICTORY');
       setSuccessData(null);
@@ -494,7 +488,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white font-['Press_Start_2P'] pb-32 relative overflow-y-auto">
       {successData && (
-        <div className={`fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto transition-opacity duration-500 ${isTransitioning ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
            <RetroCard borderColor="green" className="max-w-md w-full text-center">
               {successData.isLevelUp && successData.nextScenarioId !== 'the_question' && (
                  <div className="mb-6 animate-bounce">
