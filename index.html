@@ -76,16 +76,28 @@
         100% { opacity: 0.63337; }
       }
 
-      /* Boss Encounter Strobe */
+      /* Doubled Boss Encounter Strobe Duration */
       @keyframes boss-strobe {
         0% { background-color: black; opacity: 1; }
-        12% { background-color: white; opacity: 1; }
-        25% { background-color: black; opacity: 1; }
-        37% { background-color: white; opacity: 1; }
+        5% { background-color: white; opacity: 1; }
+        10% { background-color: black; opacity: 1; }
+        15% { background-color: white; opacity: 1; }
+        20% { background-color: black; opacity: 1; }
+        25% { background-color: white; opacity: 1; }
+        30% { background-color: black; opacity: 1; }
+        35% { background-color: white; opacity: 1; }
+        40% { background-color: black; opacity: 1; }
+        45% { background-color: white; opacity: 1; }
         50% { background-color: black; opacity: 1; }
-        62% { background-color: white; opacity: 1; }
-        75% { background-color: black; opacity: 1; }
-        87% { background-color: white; opacity: 1; }
+        55% { background-color: white; opacity: 1; }
+        60% { background-color: black; opacity: 1; }
+        65% { background-color: white; opacity: 1; }
+        70% { background-color: black; opacity: 1; }
+        75% { background-color: white; opacity: 1; }
+        80% { background-color: black; opacity: 1; }
+        85% { background-color: white; opacity: 1; }
+        90% { background-color: black; opacity: 1; }
+        95% { background-color: white; opacity: 1; }
         100% { background-color: black; opacity: 1; }
       }
 
@@ -96,7 +108,7 @@
       }
 
       .animate-boss-encounter {
-        animation: boss-strobe 0.8s steps(1) forwards;
+        animation: boss-strobe 1.6s steps(1) forwards;
       }
 
       .checkerboard-overlay {
@@ -107,7 +119,7 @@
         height: 100vh;
         z-index: 10000;
         display: grid;
-        grid-template-columns: repeat(15, 1fr); /* Increased grid density */
+        grid-template-columns: repeat(15, 1fr);
         grid-template-rows: repeat(15, 1fr);
         pointer-events: none;
       }
@@ -118,7 +130,7 @@
       }
 
       .animate-checker {
-        animation: checkerboard-in 0.8s forwards; /* Slower dissolve */
+        animation: checkerboard-in 0.8s forwards;
       }
 
       /* Cinematic Blackout for Time Skips */
@@ -152,7 +164,7 @@
 
       .animate-reveal-slow {
         animation: reveal-scene 4s ease-in-out forwards;
-        z-index: 10002; /* Topmost priority */
+        z-index: 10002;
         pointer-events: none;
       }
 

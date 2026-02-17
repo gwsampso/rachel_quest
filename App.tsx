@@ -187,13 +187,9 @@ const App: React.FC = () => {
   const triggerSlowReveal = () => {
     const overlay = document.getElementById('flash-overlay');
     if (overlay) {
-      // Remove any previous animations
       overlay.classList.remove('animate-flash');
       overlay.classList.remove('animate-reveal-slow');
-      
-      // Ensure it starts from opacity 1 (black)
       void overlay.offsetWidth; 
-      
       overlay.classList.add('animate-reveal-slow');
     }
   };
@@ -206,21 +202,20 @@ const App: React.FC = () => {
       overlay.classList.add('animate-boss-encounter');
       
       container.innerHTML = '';
-      // Increased grid density (15x15)
       for (let i = 0; i < 225; i++) { 
         const square = document.createElement('div');
         square.className = 'checker-square';
-        // Increased delay range to make the transition longer (up to 2.5s delay + 0.8s animation)
-        square.style.animationDelay = `${Math.random() * 2.5}s`; 
+        // Reduced max delay to 2.2s. 
+        // 2.2s delay + 0.8s animation = Exactly 3.0s total coverage time.
+        square.style.animationDelay = `${Math.random() * 2.2}s`; 
         square.classList.add('animate-checker');
         container.appendChild(square);
       }
 
-      // Cleanup after the blackout effect takes over
       setTimeout(() => {
         overlay.classList.remove('animate-boss-encounter');
         container.innerHTML = '';
-      }, 4000); 
+      }, 3200); 
     }
   };
 
@@ -282,8 +277,6 @@ const App: React.FC = () => {
     playBleep(440, 'square', 0.1, 0.1);
     setPhase('PLAYING');
     setGameOverReason('');
-    // We do NOT reset playerState here, preserving the progress up to this level.
-    // The scenario renders again, giving the user a second chance.
   };
 
   const handleOptionSelect = (optionId: 'A' | 'B') => {
@@ -315,12 +308,10 @@ const App: React.FC = () => {
         }
       }
 
-      // Special handling for Major Reno to avoid spoiler feedback
       if (playerState.currentScenarioId === 'major_reno' && !selectedOption.isGameOver) {
         setIsTransitioning(true);
         triggerBlackout();
         
-        // Apply state changes silently
         const updatedInventory = selectedOption.inventoryItem ? [...playerState.inventory, selectedOption.inventoryItem] : playerState.inventory;
         const updatedFamily = selectedOption.familyAdd ? [...playerState.family, selectedOption.familyAdd] : playerState.family;
         
@@ -339,7 +330,6 @@ const App: React.FC = () => {
         return;
       }
 
-      // Normal path for other scenarios
       if (isLevelUp) playLevelUp(); else playCoinSound();
 
       setPlayerState(prev => ({
@@ -370,19 +360,17 @@ const App: React.FC = () => {
     
     if (successData.nextScenarioId === 'the_question') {
       setIsTransitioning(true);
-      triggerBossEncounter(); // Starts ~3.5s sequence of chaos
+      triggerBossEncounter(); 
       
-      // At 3.5s, the screen is covered by black checkers.
-      // We swap the scene and trigger the slow reveal (fade from black).
+      // Reduced timeout to 3.0s to match the exact completion of the squares.
+      // This eliminates the awkward black screen pause.
       setTimeout(() => {
         setPlayerState(prev => ({ ...prev, currentScenarioId: successData.nextScenarioId }));
         setTextCompleted(false);
         setSuccessData(null);
-        
         triggerSlowReveal();
-        
         setIsTransitioning(false);
-      }, 3500); 
+      }, 3000); 
     } else if (successData.nextScenarioId === 'VICTORY') {
       setPhase('VICTORY');
       setSuccessData(null);

@@ -15,9 +15,10 @@ const ItemIcon: React.FC<ItemIconProps> = ({ name, size = 32 }) => {
     case 'Mortgage': icon = '📜'; break;
     case 'Nice Tiles': icon = '🧱'; break;
     case 'Tan': icon = '☀️'; break;
-    case 'Good Sandwich': icon = '🥪'; break;
+    case 'Yummy Toast': icon = '🥪'; break;
     case 'Dream Home': icon = '🏰'; break;
     case 'The Ring': icon = '💍'; break;
+    case 'New Car': icon = '🚗'; break;
     default: icon = '📦';
   }
 
